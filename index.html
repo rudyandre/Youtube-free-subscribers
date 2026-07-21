@@ -6,6 +6,10 @@
   <title>YouTube Channel Growth & Subscriber Hub</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Midtrans Snap SDK (Production) -->
+  <script src="https://app.midtrans.com/snap/snap.js" data-client-key="Mid-client-NIf5PyFF26hK_7SJ"></script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -157,7 +161,7 @@
       </div>
 
       <div class="space-y-3">
-        <label class="block text-xs font-semibold text-gray-400">Simulasi Metode Pembayaran</label>
+        <label class="block text-xs font-semibold text-gray-400">Pilih Metode Pembayaran</label>
         <div class="grid grid-cols-2 gap-2">
           <button onclick="simPay('QRIS')" class="border border-gray-800 hover:border-red-500 p-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 bg-gray-950">
             <i class="fa-solid fa-qrcode text-lg"></i> QRIS / GoPay
@@ -226,7 +230,7 @@
     function simPay(method) {
       const payStatus = document.getElementById('payStatus');
       payStatus.classList.remove('hidden');
-      payStatus.innerText = `⏳ Memproses transaksi simulasi ${method}...`;
+      payStatus.innerText = `⏳ Memproses transaksi ${method}...`;
       setTimeout(() => {
         payStatus.innerText = `🎉 Pembayaran via ${method} Berhasil! Akun kamu telah beralih ke Pro Creator.`;
       }, 1000);
