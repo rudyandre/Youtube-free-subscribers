@@ -1,0 +1,37 @@
+# 🏆 WorldCup 2026 Hub - Portal & Live Center
+
+WorldCup 2026 Hub adalah aplikasi web modern, responsif, dan interaktif yang dirancang untuk memantau turnamen Piala Dunia 2026. Aplikasi ini dilengkapi dengan skor *Live*, hitung mundur (*countdown*), klasemen babak grup, daftar top skor (*Golden Boot*), serta bagan babak gugur (*Knockout Bracket*).
+
+---
+
+## 🛠️ Teknologi yang Digunakan
+
+- **Frontend:** React.js, Tailwind CSS, Lucide React Icons, Axios
+- **Backend:** Python (FastAPI), AsyncIOMotorClient, Pydantic, HTTPX
+- **Database:** MongoDB (Motor Async Client)
+- **Deployment & Hosting:** Vercel / Cloud Provider
+
+---
+
+## 📂 Struktur Proyek
+
+```text
+.
+├── backend/
+│   ├── server.py             # Server FastAPI Utama & Endpoint API
+│   ├── requirements.txt      # Dependency Python
+│   └── .env                  # Variable Lingkungan Backend
+└── frontend/
+    ├── src/
+    │   ├── components/       # Komponen UI (Header, Hero, Standings, Bracket, dll)
+    │   │   ├── Header.jsx
+    │   │   ├── HeroSection.jsx
+    │   │   ├── GroupStandings.jsx
+    │   │   ├── LiveScores.jsx
+    │   │   ├── TopScorers.jsx
+    │   │   └── KnockoutBracket.jsx
+    │   ├── pages/
+    │   │   └── Dashboard.jsx # Halaman Utama Aplikasi
+    │   ├── App.js            # Routing React
+    │   └── App.css           # Styling Custom & Scrollbar
+    └── package.json
