@@ -1,0 +1,997 @@
+
+
+Action: design_agent_v1_gemini_3_1_pro({"task":"\n**original_problem_statement**: \"Build a clean, modern, and responsive Web App titled 'YouTube Channel Growth & Subscriber Hub'. The app should serve as an interactive dashboard and toolkit to help content creators optimize, manage, and boost their YouTube subscribers organically.\n\nKey Features & Layout Requirements:\n- Hero Section & Navigation with modern header, logo, app title, and dark/light mode toggle. Quick overview card showing key stats (Target Subscribers, Current Goal Progress %, Estimated Days to Goal).\n- Sub4Sub & Engagement Strategy Guide (Organic Focus): interactive checklist with progress bar (Optimize SEO Title & Tags, Add Watermark Subscribe Button, Create Eye-Catching Thumbnail, Publish Shorts Regularly).\n- YouTube Channel Audit & SEO Optimizer: input fields for Channel Name, Niche, Video Title, Description. 'Generate Optimization Tips' button.\n- CTA & Hook Generator Tool: select channel category (Gaming, Tech, Vlogging, Education), get ready-to-use verbal CTA scripts and pinned comment templates.\n- Sub Goal Widget Generator: customizable visual progress widget with color options, embed code copy.\n- Pricing & Premium Membership section with Free and Pro Creator ($5/Rp 75.000/month) plan cards.\n- Checkout Modal with Full Name, Email, Payment Method selector (QRIS, Bank Transfer/VA, E-Wallet), order summary. Success modal after payment.\n\nUI/UX Style: sleek YouTube-inspired palette (Red #FF0000, Dark Charcoal #0F0F0F, White, Soft Slate Gray). Clean typography, card-based layout, intuitive buttons. Fully responsive.\"\n\n**user_choices**: \"No explicit design preferences provided by user.\"\n\n**key_functionalities**: \"Hero stats overview card, Growth strategy checklist with progress bar, SEO Optimizer form with instant feedback, CTA/Hook Generator with category selector, Sub Goal Widget generator with customization and embed code, Pricing tier cards (Free + Pro), Midtrans Payment checkout modal, Success confirmation modal, Dark/Light mode toggle\"\n\n**app_type**: \"dashboard / saas_app hybrid — creator-focused toolkit with payment upgrade flow\"\n"})
+Observation: ## YouTube Channel Growth Hub Design Complete
+- Generated fully custom design guidelines for the SaaS/creator dashboard
+- Set up typography (Outfit/Manrope) and color schema focusing on Electric Red and Deep Obsidian for a YouTube-inspired but high-end 'Godly' aesthetic
+- Curated relevant imagery from Unsplash/Pexels for dashboard aesthetics
+- Created `/app/design_guidelines.json` for the main agent with layout, spacing, components, and interaction instructions.
+- Next Action Items: Main agent to implement the application based on `/app/design_guidelines.json`.
+
+
+Action: view_bulk({"paths":["/app/backend/server.py","/app/backend/requirements.txt","/app/backend/.env","/app/frontend/.env","/app/frontend/package.json","/app/frontend/src/App.js","/app/frontend/src/App.css","/app/frontend/src/index.css","/app/frontend/src/index.js","/app/frontend/src/components/ui"]})
+Observation: ===FILE: /app/backend/server.py
+/app/backend/server.py:
+1|from fastapi import FastAPI, APIRouter
+2|from dotenv import load_dotenv
+3|from starlette.middleware.cors import CORSMiddleware
+4|from motor.motor_asyncio import AsyncIOMotorClient
+5|import os
+6|import logging
+7|from pathlib import Path
+8|from pydantic import BaseModel, Field, ConfigDict
+9|from typing import List
+10|import uuid
+11|from datetime import datetime, timezone
+12|
+13|
+14|ROOT_DIR = Path(__file__).parent
+15|load_dotenv(ROOT_DIR / '.env')
+16|
+17|# MongoDB connection
+18|mongo_url = os.environ['MONGO_URL']
+19|client = AsyncIOMotorClient(mongo_url)
+20|db = client[os.environ['DB_NAME']]
+21|
+22|# Create the main app without a prefix
+23|app = FastAPI()
+24|
+25|# Create a router with the /api prefix
+26|api_router = APIRouter(prefix="/api")
+27|
+28|
+29|# Define Models
+30|class StatusCheck(BaseModel):
+31|    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
+32|    
+33|    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+34|    client_name: str
+35|    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+36|
+37|class StatusCheckCreate(BaseModel):
+38|    client_name: str
+39|
+40|# Add your routes to the router instead of directly to app
+41|@api_router.get("/")
+42|async def root():
+43|    return {"message": "Hello World"}
+44|
+45|@api_router.post("/status", response_model=StatusCheck)
+46|async def create_status_check(input: StatusCheckCreate):
+47|    status_dict = input.model_dump()
+48|    status_obj = StatusCheck(**status_dict)
+49|    
+50|    # Convert to dict and serialize datetime to ISO string for MongoDB
+51|    doc = status_obj.model_dump()
+52|    doc['timestamp'] = doc['timestamp'].isoformat()
+53|    
+54|    _ = await db.status_checks.insert_one(doc)
+55|    return status_obj
+56|
+57|@api_router.get("/status", response_model=List[StatusCheck])
+58|async def get_status_checks():
+59|    # Exclude MongoDB's _id field from the query results
+60|    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
+61|    
+62|    # Convert ISO string timestamps back to datetime objects
+63|    for check in status_checks:
+64|        if isinstance(check['timestamp'], str):
+65|            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
+66|    
+67|    return status_checks
+68|
+69|# Include the router in the main app
+70|app.include_router(api_router)
+71|
+72|app.add_middleware(
+73|    CORSMiddleware,
+74|    allow_credentials=True,
+75|    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+76|    allow_methods=["*"],
+77|    allow_headers=["*"],
+78|)
+79|
+80|# Configure logging
+81|logging.basicConfig(
+82|    level=logging.INFO,
+83|    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+84|)
+85|logger = logging.getLogger(__name__)
+86|
+87|@app.on_event("shutdown")
+88|async def shutdown_db_client():
+89|    client.close()
+
+===END
+
+===FILE: /app/backend/requirements.txt
+/app/backend/requirements.txt:
+1|fastapi==0.110.1
+2|uvicorn==0.25.0
+3|boto3>=1.34.129
+4|requests-oauthlib>=2.0.0
+5|cryptography>=42.0.8
+6|python-dotenv>=1.0.1
+7|pymongo==4.6.3
+8|pydantic>=2.6.4
+9|email-validator>=2.2.0
+10|pyjwt>=2.10.1
+11|bcrypt==4.1.3
+12|passlib>=1.7.4
+13|tzdata>=2024.2
+14|motor==3.3.1
+15|pytest>=8.0.0
+16|pytest-xdist>=3.6.0
+17|black>=24.1.1
+18|isort>=5.13.2
+19|flake8>=7.0.0
+20|mypy>=1.8.0
+21|python-jose>=3.3.0
+22|requests>=2.31.0
+23|pandas>=2.2.0
+24|numpy>=1.26.0
+25|python-multipart>=0.0.9
+26|jq>=1.6.0
+27|typer>=0.9.0
+28|emergentintegrations==0.2.0
+29|
+
+===END
+
+===FILE: /app/backend/.env
+/app/backend/.env:
+1|MONGO_URL="mongodb://localhost:27017"
+2|DB_NAME="test_database"
+3|CORS_ORIGINS="*"
+
+===END
+
+===FILE: /app/frontend/.env
+/app/frontend/.env:
+1|REACT_APP_BACKEND_URL=https://youtube-growth-hub-109.preview.emergentagent.com
+2|WDS_SOCKET_PORT=443
+3|ENABLE_HEALTH_CHECK=false
+
+===END
+
+===FILE: /app/frontend/package.json
+/app/frontend/package.json:
+1|{
+2|  "name": "frontend",
+3|  "version": "0.1.0",
+4|  "private": true,
+5|  "dependencies": {
+6|    "@hookform/resolvers": "5.0.1",
+7|    "@radix-ui/react-accordion": "1.2.8",
+8|    "@radix-ui/react-alert-dialog": "1.1.11",
+9|    "@radix-ui/react-aspect-ratio": "1.1.4",
+10|    "@radix-ui/react-avatar": "1.1.7",
+11|    "@radix-ui/react-checkbox": "1.2.3",
+12|    "@radix-ui/react-collapsible": "1.1.8",
+13|    "@radix-ui/react-context-menu": "2.2.12",
+14|    "@radix-ui/react-dialog": "1.1.11",
+15|    "@radix-ui/react-dropdown-menu": "2.1.12",
+16|    "@radix-ui/react-hover-card": "1.1.11",
+17|    "@radix-ui/react-label": "2.1.4",
+18|    "@radix-ui/react-menubar": "1.1.12",
+19|    "@radix-ui/react-navigation-menu": "1.2.10",
+20|    "@radix-ui/react-popover": "1.1.11",
+21|    "@radix-ui/react-progress": "1.1.4",
+22|    "@radix-ui/react-radio-group": "1.3.4",
+23|    "@radix-ui/react-scroll-area": "1.2.6",
+24|    "@radix-ui/react-select": "2.2.2",
+25|    "@radix-ui/react-separator": "1.1.4",
+26|    "@radix-ui/react-slider": "1.3.2",
+27|    "@radix-ui/react-slot": "1.2.0",
+28|    "@radix-ui/react-switch": "1.2.2",
+29|    "@radix-ui/react-tabs": "1.1.9",
+30|    "@radix-ui/react-toast": "1.2.11",
+31|    "@radix-ui/react-toggle": "1.1.6",
+32|    "@radix-ui/react-toggle-group": "1.1.7",
+33|    "@radix-ui/react-tooltip": "1.2.4",
+34|    "@tanstack/react-query": "5.56.2",
+35|    "axios": "1.16.0",
+36|    "class-variance-authority": "0.7.1",
+37|    "clsx": "2.1.1",
+38|    "cmdk": "1.1.1",
+39|    "cra-template": "1.2.0",
+40|    "date-fns": "4.1.0",
+41|    "dayjs": "1.11.13",
+42|    "embla-carousel-react": "8.6.0",
+43|    "framer-motion": "11.18.0",
+44|    "input-otp": "1.4.2",
+45|    "lodash": "4.18.1",
+46|    "lucide-react": "0.516.0",
+47|    "next-themes": "0.4.6",
+48|    "react": "19.0.0",
+49|    "react-day-picker": "8.10.1",
+50|    "react-dom": "19.0.0",
+51|    "react-hook-form": "7.56.2",
+52|    "react-resizable-panels": "3.0.1",
+53|    "react-router-dom": "7.15.0",
+54|    "react-scripts": "5.0.1",
+55|    "recharts": "3.6.0",
+56|    "sonner": "2.0.3",
+57|    "swr": "2.3.8",
+58|    "tailwind-merge": "3.2.0",
+59|    "tailwindcss-animate": "1.0.7",
+60|    "vaul": "1.1.2",
+61|    "zod": "3.24.4"
+62|  },
+63|  "scripts": {
+64|    "start": "craco start",
+65|    "build": "craco build",
+66|    "test": "craco test"
+67|  },
+68|  "browserslist": {
+69|    "production": [
+70|      ">0.2%",
+71|      "not dead",
+72|      "not op_mini all"
+73|    ],
+74|    "development": [
+75|      "last 1 chrome version",
+76|      "last 1 firefox version",
+77|      "last 1 safari version"
+78|    ]
+79|  },
+80|  "devDependencies": {
+81|    "@babel/plugin-proposal-private-property-in-object": "7.21.11",
+82|    "@craco/craco": "7.1.0",
+83|    "@emergentbase/visual-edits": "https://assets.emergent.sh/npm/emergentbase-visual-edits-1.0.13.tgz",
+84|    "@eslint/js": "9.23.0",
+85|    "@types/lodash": "4.17.24",
+86|    "autoprefixer": "10.4.20",
+87|    "dotenv": "16.4.5",
+88|    "eslint": "9.23.0",
+89|    "eslint-plugin-import": "2.31.0",
+90|    "eslint-plugin-jsx-a11y": "6.10.2",
+91|    "eslint-plugin-react": "7.37.4",
+92|    "eslint-plugin-react-hooks": "5.2.0",
+93|    "globals": "15.15.0",
+94|    "postcss": "8.5.10",
+95|    "tailwindcss": "3.4.17"
+96|  },
+97|  "resolutions": {
+98|    "react-router": "7.15.1",
+99|    "node-forge": "1.4.0",
+100|    "fast-uri": "3.1.2",
+101|    "flatted": "3.4.2",
+102|    "qs": "6.15.2",
+103|    "diff": "4.0.4",
+104|    "follow-redirects": "1.16.0",
+105|    "path-to-regexp": "0.1.13",
+106|    "rollup": "2.80.0",
+107|    "underscore": "1.13.8",
+108|    "@babel/plugin-transform-modules-systemjs": "7.29.4",
+109|    "@eslint/plugin-kit": "0.3.4",
+110|    "shell-quote": "1.8.4",
+111|    "jsonpath": "1.3.0",
+112|    "nth-check": "2.0.1",
+113|    "serialize-javascript": "7.0.5",
+114|    "uuid": "11.1.1",
+115|    "@tootallnate/once": "2.0.1",
+116|    "webpack-dev-server": "5.2.5",
+117|    "resolve-url-loader": "5.0.0",
+118|    "**/resolve-url-loader/postcss": "8.5.10",
+119|    "**/axios/form-data": "4.0.6",
+120|    "**/jsdom/form-data": "3.0.5",
+121|    "**/postcss-svgo/svgo": "2.8.1",
+122|    "**/webpack-dev-server/ws": "8.21.0",
+123|    "**/postcss-load-config/yaml": "2.8.3",
+124|    "**/cosmiconfig/yaml": "1.10.3",
+125|    "**/cssnano/yaml": "1.10.3",
+126|    "**/eslint/js-yaml": "4.2.0",
+127|    "**/@eslint/eslintrc/js-yaml": "4.2.0",
+128|    "**/svgo/js-yaml": "3.15.0",
+129|    "**/@istanbuljs/load-nyc-config/js-yaml": "3.15.0",
+130|    "**/css-loader/postcss": "8.5.10",
+131|    "**/css-minimizer-webpack-plugin/postcss": "8.5.10",
+132|    "**/react-scripts/postcss": "8.5.10",
+133|    "**/filelist/minimatch": "5.1.8",
+134|    "**/anymatch/picomatch": "2.3.2",
+135|    "**/micromatch/picomatch": "2.3.2",
+136|    "**/readdirp/picomatch": "2.3.2",
+137|    "**/jest-util/picomatch": "2.3.2",
+138|    "**/tinyglobby/picomatch": "4.0.4",
+139|    "http-proxy-middleware": "2.0.10"
+140|  },
+141|  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+142|}
+143|
+
+===END
+
+===FILE: /app/frontend/src/App.js
+/app/frontend/src/App.js:
+1|import { useEffect } from "react";
+2|import "@/App.css";
+3|import { BrowserRouter, Routes, Route } from "react-router-dom";
+4|import axios from "axios";
+5|import { HOME } from "@/constants/testIds";
+6|
+7|const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+8|const API = `${BACKEND_URL}/api`;
+9|
+10|const Home = () => {
+11|  const helloWorldApi = async () => {
+12|    try {
+13|      const response = await axios.get(`${API}/`);
+14|      console.log(response.data.message);
+15|    } catch (e) {
+16|      console.error(e, `errored out requesting / api`);
+17|    }
+18|  };
+19|
+20|  useEffect(() => {
+21|    helloWorldApi();
+22|  }, []);
+23|
+24|  return (
+25|    <div>
+26|      <header className="App-header">
+27|        <a
+28|          data-testid={HOME.emergentLink}
+29|          className="App-link"
+30|          href="https://emergent.sh"
+31|          target="_blank"
+32|          rel="noopener noreferrer"
+33|        >
+34|          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
+35|        </a>
+36|        <p className="mt-5">Building something incredible ~!</p>
+37|      </header>
+38|    </div>
+39|  );
+40|};
+41|
+42|function App() {
+43|  return (
+44|    <div className="App">
+45|      <BrowserRouter>
+46|        <Routes>
+47|          <Route path="/" element={<Home />}>
+48|            <Route index element={<Home />} />
+49|          </Route>
+50|        </Routes>
+51|      </BrowserRouter>
+52|    </div>
+53|  );
+54|}
+55|
+56|export default App;
+57|
+
+===END
+
+===FILE: /app/frontend/src/App.css
+/app/frontend/src/App.css:
+1|.App-logo {
+2|    height: 40vmin;
+3|    pointer-events: none;
+4|}
+5|
+6|@media (prefers-reduced-motion: no-preference) {
+7|    .App-logo {
+8|        animation: App-logo-spin infinite 20s linear;
+9|    }
+10|}
+11|
+12|.App-header {
+13|    background-color: #0f0f10;
+14|    min-height: 100vh;
+15|    display: flex;
+16|    flex-direction: column;
+17|    align-items: center;
+18|    justify-content: center;
+19|    font-size: calc(10px + 2vmin);
+20|    color: white;
+21|}
+22|
+23|.App-link {
+24|    color: #61dafb;
+25|}
+26|
+27|@keyframes App-logo-spin {
+28|    from {
+29|        transform: rotate(0deg);
+30|    }
+31|    to {
+32|        transform: rotate(360deg);
+33|    }
+34|}
+35|
+
+===END
+
+===FILE: /app/frontend/src/index.css
+/app/frontend/src/index.css:
+1|@tailwind base;
+2|@tailwind components;
+3|@tailwind utilities;
+4|
+5|body {
+6|    margin: 0;
+7|    font-family:
+8|        -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+9|        "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+10|        sans-serif;
+11|    -webkit-font-smoothing: antialiased;
+12|    -moz-osx-font-smoothing: grayscale;
+13|}
+14|
+15|code {
+16|    font-family:
+17|        source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+18|}
+19|
+20|@layer base {
+21|    :root {
+22|        --background: 0 0% 100%;
+23|        --foreground: 0 0% 3.9%;
+24|        --card: 0 0% 100%;
+25|        --card-foreground: 0 0% 3.9%;
+26|        --popover: 0 0% 100%;
+27|        --popover-foreground: 0 0% 3.9%;
+28|        --primary: 0 0% 9%;
+29|        --primary-foreground: 0 0% 98%;
+30|        --secondary: 0 0% 96.1%;
+31|        --secondary-foreground: 0 0% 9%;
+32|        --muted: 0 0% 96.1%;
+33|        --muted-foreground: 0 0% 45.1%;
+34|        --accent: 0 0% 96.1%;
+35|        --accent-foreground: 0 0% 9%;
+36|        --destructive: 0 84.2% 60.2%;
+37|        --destructive-foreground: 0 0% 98%;
+38|        --border: 0 0% 89.8%;
+39|        --input: 0 0% 89.8%;
+40|        --ring: 0 0% 3.9%;
+41|        --chart-1: 12 76% 61%;
+42|        --chart-2: 173 58% 39%;
+43|        --chart-3: 197 37% 24%;
+44|        --chart-4: 43 74% 66%;
+45|        --chart-5: 27 87% 67%;
+46|        --radius: 0.5rem;
+47|    }
+48|    .dark {
+49|        --background: 0 0% 3.9%;
+50|        --foreground: 0 0% 98%;
+51|        --card: 0 0% 3.9%;
+52|        --card-foreground: 0 0% 98%;
+53|        --popover: 0 0% 3.9%;
+54|        --popover-foreground: 0 0% 98%;
+55|        --primary: 0 0% 98%;
+56|        --primary-foreground: 0 0% 9%;
+57|        --secondary: 0 0% 14.9%;
+58|        --secondary-foreground: 0 0% 98%;
+59|        --muted: 0 0% 14.9%;
+60|        --muted-foreground: 0 0% 63.9%;
+61|        --accent: 0 0% 14.9%;
+62|        --accent-foreground: 0 0% 98%;
+63|        --destructive: 0 62.8% 30.6%;
+64|        --destructive-foreground: 0 0% 98%;
+65|        --border: 0 0% 14.9%;
+66|        --input: 0 0% 14.9%;
+67|        --ring: 0 0% 83.1%;
+68|        --chart-1: 220 70% 50%;
+69|        --chart-2: 160 60% 45%;
+70|        --chart-3: 30 80% 55%;
+71|        --chart-4: 280 65% 60%;
+72|        --chart-5: 340 75% 55%;
+73|    }
+74|}
+75|
+76|@layer base {
+77|    * {
+78|        @apply border-border;
+79|    }
+80|    body {
+81|        @apply bg-background text-foreground;
+82|    }
+83|}
+84|
+85|@layer base {
+86|    [data-debug-wrapper="true"] {
+87|        display: contents !important;
+88|    }
+89|
+90|    [data-debug-wrapper="true"] > * {
+91|        margin-left: inherit;
+92|        margin-right: inherit;
+93|        margin-top: inherit;
+94|        margin-bottom: inherit;
+95|        padding-left: inherit;
+96|        padding-right: inherit;
+97|        padding-top: inherit;
+98|        padding-bottom: inherit;
+99|        column-gap: inherit;
+100|        row-gap: inherit;
+101|        gap: inherit;
+102|        border-left-width: inherit;
+103|        border-right-width: inherit;
+104|        border-top-width: inherit;
+105|        border-bottom-width: inherit;
+106|        border-left-style: inherit;
+107|        border-right-style: inherit;
+108|        border-top-style: inherit;
+109|        border-bottom-style: inherit;
+110|        border-left-color: inherit;
+111|        border-right-color: inherit;
+112|        border-top-color: inherit;
+113|        border-bottom-color: inherit;
+114|    }
+115|}
+116|
+
+===END
+
+===FILE: /app/frontend/src/index.js
+/app/frontend/src/index.js:
+1|import React from "react";
+2|import ReactDOM from "react-dom/client";
+3|import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+4|import "@/index.css";
+5|import App from "@/App";
+6|
+7|const queryClient = new QueryClient({
+8|  defaultOptions: {
+9|    queries: {
+10|      staleTime: 60_000,
+11|      refetchOnWindowFocus: false,
+12|    },
+13|  },
+14|});
+15|
+16|const root = ReactDOM.createRoot(document.getElementById("root"));
+17|root.render(
+18|  <React.StrictMode>
+19|    <QueryClientProvider client={queryClient}>
+20|      <App />
+21|    </QueryClientProvider>
+22|  </React.StrictMode>,
+23|);
+24|
+
+===END
+
+===DIR: /app/frontend/src/components/ui
+/app/frontend/src/components/ui/ (depth=2):
+/app/frontend/src/components/ui/accordion.jsx
+/app/frontend/src/components/ui/alert-dialog.jsx
+/app/frontend/src/components/ui/alert.jsx
+/app/frontend/src/components/ui/aspect-ratio.jsx
+/app/frontend/src/components/ui/avatar.jsx
+/app/frontend/src/components/ui/badge.jsx
+/app/frontend/src/components/ui/breadcrumb.jsx
+/app/frontend/src/components/ui/button.jsx
+/app/frontend/src/components/ui/calendar.jsx
+/app/frontend/src/components/ui/card.jsx
+/app/frontend/src/components/ui/carousel.jsx
+/app/frontend/src/components/ui/checkbox.jsx
+/app/frontend/src/components/ui/collapsible.jsx
+/app/frontend/src/components/ui/command.jsx
+/app/frontend/src/components/ui/context-menu.jsx
+/app/frontend/src/components/ui/dialog.jsx
+/app/frontend/src/components/ui/drawer.jsx
+/app/frontend/src/components/ui/dropdown-menu.jsx
+/app/frontend/src/components/ui/form.jsx
+/app/frontend/src/components/ui/hover-card.jsx
+/app/frontend/src/components/ui/input-otp.jsx
+/app/frontend/src/components/ui/input.jsx
+/app/frontend/src/components/ui/label.jsx
+/app/frontend/src/components/ui/menubar.jsx
+/app/frontend/src/components/ui/navigation-menu.jsx
+/app/frontend/src/components/ui/pagination.jsx
+/app/frontend/src/components/ui/popover.jsx
+/app/frontend/src/components/ui/progress.jsx
+/app/frontend/src/components/ui/radio-group.jsx
+/app/frontend/src/components/ui/resizable.jsx
+/app/frontend/src/components/ui/scroll-area.jsx
+/app/frontend/src/components/ui/select.jsx
+/app/frontend/src/components/ui/separator.jsx
+/app/frontend/src/components/ui/sheet.jsx
+/app/frontend/src/components/ui/skeleton.jsx
+/app/frontend/src/components/ui/slider.jsx
+/app/frontend/src/components/ui/sonner.jsx
+/app/frontend/src/components/ui/switch.jsx
+/app/frontend/src/components/ui/table.jsx
+/app/frontend/src/components/ui/tabs.jsx
+/app/frontend/src/components/ui/textarea.jsx
+/app/frontend/src/components/ui/toast.jsx
+/app/frontend/src/components/ui/toaster.jsx
+/app/frontend/src/components/ui/toggle-group.jsx
+/app/frontend/src/components/ui/toggle.jsx
+/app/frontend/src/components/ui/tooltip.jsx
+
+===END
+
+
+Action: integration_playbook_expert_v2({})
+Observation: Memory Fetched
+
+
+Action: view_bulk({"paths":["/app/design_guidelines.json"]})
+Observation: ===FILE: /app/design_guidelines.json
+/app/design_guidelines.json:
+1|{
+2|  "theme": "dark_mode_preferred",
+3|  "typography": {
+4|    "headings": "Outfit, sans-serif",
+5|    "body": "Manrope, sans-serif",
+6|    "strategy": "Avoid generic fonts for headings. Use Outfit for a high-energy, authoritative tech feel. Use Manrope for high legibility in data-dense areas. Use tracking-tight on all H1/H2."
+7|  },
+8|  "colors": {
+9|    "primary": "#FF0000",
+10|    "primary_hover": "#CC0000",
+11|    "background_dark": "#0A0A0A",
+12|    "card_dark": "#121212",
+13|    "text_primary": "#FFFFFF",
+14|    "text_secondary": "#A1A1AA",
+15|    "border": "#27272A",
+16|    "accent_glow": "rgba(255, 0, 0, 0.15)",
+17|    "strategy": "Archetype: Electric & Neon blended with Swiss Brutalism. Deep Obsidian anchor (#0A0A0A) with Pure White text. Use Electric Red (#FF0000) strictly for kinetic triggers and primary actions. Never use pure transparent backgrounds; use tinted glassmorphism."
+18|  },
+19|  "visual_enhancers": {
+20|    "surfaces": "Use The 'Grid Borders' look for dashboards. Expose the skeleton with subtle borders. Use 'Glassmorphism' with backdrop-blur-xl and 1px delicate inner stroke for sticky headers and modals.",
+21|    "shadows": "Minimal shadows. Rely on crisp 1px borders (border-white/10 in dark mode) to define hierarchy.",
+22|    "textures": "Subtle noise overlay on the background to kill digital flatness."
+23|  },
+24|  "layouts": {
+25|    "dashboard_grid": "The 'Bento' Grid Protocol. Use grid-cols-1 md:grid-cols-3 lg:grid-cols-4 with gap-6. Prioritize 'North Star Metric' in the top left.",
+26|    "spacing": "Generous Spacing. Use p-6 or p-8 inside cards. No cramped elements."
+27|  },
+28|  "components": {
+29|    "header": "Sticky with z-50. Glassmorphism background. Must include Logo, Title, Navigation links, Dark/Light toggle, User Avatar.",
+30|    "cards": "Flat background, 1px subtle border, no shadow by default. Hover: slight lift and border color lightens.",
+31|    "buttons": "Pill-shaped or slightly rounded (radius-md). Primary buttons use #FF0000 background. Focus states must have high contrast ring.",
+32|    "inputs": "Shadcn defaults but with darker backgrounds (#121212) and clear focus rings (ring-red-500).",
+33|    "modals": "Use Shadcn Dialog. Must have clear backdrop overlay (bg-black/80 backdrop-blur-sm).",
+34|    "toasts": "Use Sonner for notifications (e.g., 'Embed code copied', 'Payment successful')."
+35|  },
+36|  "sections_and_features": {
+37|    "hero_overview": "Top bento grid. Span 2 columns for Main Stats (Target, Progress, Days left). Include a decorative card with the abstract red neon image.",
+38|    "checklist": "Interactive UI with progress bar at top. Strikethrough text when checked.",
+39|    "seo_optimizer": "Form layout with 2 columns on desktop. Channel Name & Niche (Row 1), Title & Description (Row 2). Results appear in a distinct 'Terminal' or 'Glass' styled box below.",
+40|    "hook_generator": "Dropdown for category, followed by generated text cards with 'Copy' buttons.",
+41|    "widget_generator": "Split view: Left side controls (color picker, size), Right side live preview of the widget on a contrasting background. Below: code block with copy action.",
+42|    "pricing": "Two columns. 'Pro' card must have 'Tracing Beam' or glowing red border. Emphasize $5/Rp 75.000.",
+43|    "checkout_modal": "Clean, high-trust layout. Summary on right/top, payment methods (QRIS, VA, E-Wallet) as selectable large buttons/tiles. Success modal with confetti or checkmark."
+44|  },
+45|  "media": {
+46|    "images": [
+47|      {
+48|        "url": "https://images.pexels.com/photos/1996035/pexels-photo-1996035.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+49|        "description": "Abstract red neon beams",
+50|        "usage": "Use as a background layer in the Hero section or decorative card in the Bento grid"
+51|      },
+52|      {
+53|        "url": "https://images.pexels.com/photos/19929601/pexels-photo-19929601.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+54|        "description": "Creator working on laptop outdoors",
+55|        "usage": "Use in the Pricing section or as a banner for the 'Pro' upgrade"
+56|      }
+57|    ]
+58|  },
+59|  "motion": {
+60|    "interactions": "Hover states on all buttons/cards. Use Framer Motion for checklist progress bar filling and smooth modal entrances. Add staggered entrance animations for bento grid items."
+61|  },
+62|  "accessibility": {
+63|    "guidelines": "Ensure >4.5:1 contrast for all text. Red #FF0000 on #0A0A0A is highly visible. Add aria-labels to icon buttons. Support prefers-reduced-motion."
+64|  },
+65|  "data_testid": {
+66|    "instructions": "All interactive elements (buttons, inputs, checklist items, copy buttons, checkout submit) MUST include descriptive data-testid attributes (e.g., data-testid='seo-generate-button')."
+67|  },
+68|  "instructions_to_main_agent": [
+69|    "Install and use Outfit for headings and Manrope for body text (import via Google Fonts in index.css).",
+70|    "Install lucide-react for icons.",
+71|    "Install framer-motion for animations.",
+72|    "Use Shadcn UI for standard inputs, selects, dialogs, and progress bars. Customize their CSS to match the dark obsidian and neon red theme.",
+73|    "Ensure dark mode is the default and looks impeccable. Light mode should use clean white and soft grays.",
+74|    "Do NOT center align the app container. Left align form labels and text content.",
+75|    "Implement the specific features: Hero Stats, Checklist, SEO form, Hook Generator, Widget preview, Pricing cards, and Checkout modal.",
+76|    "In the CTA & Hook Generator, mock the generated responses if necessary but make them realistic.",
+77|    "Use the provided image URLs. NEVER use placeholder services.",
+78|    "For toasts, Sonner components are located in /app/frontend/src/components/ui/sonner.js or sonner.jsx. Use standard .js extensions for everything.",
+79|    "Generate the embed code for the Sub Goal Widget dynamically based on user selections."
+80|  ],
+81|  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+82|    "You tend to converge toward generic, 'on distribution' outputs. Avoid this: make creative, distinctive frontends.",
+83|    "Create depth through layered design elements with z-index hierarchy.",
+84|    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+85|    "You MUST NOT apply universal transition. Eg: transition: all.",
+86|    "You MUST NOT center align the app container, ie do not add .App { text-align: center; }.",
+87|    "Always use modern button styles with interaction animations.",
+88|    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+89|    "Every interaction needs micro-animations - hover states, transitions, entrance animations.",
+90|    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+91|    "Use sonner for toasts. Sonner component are located in /app/frontend/src/components/ui/sonner.jsx or .js"
+92|  ]
+93|}
+
+===END
+
+
+Now I have all the context. Let me build the app. I'll install httpx, add Midtrans keys to .env, and create all files in parallel.
+Action: view_bulk({"paths":["/app/frontend/src/hooks/use-toast.js","/app/frontend/src/lib/utils.js","/app/frontend/src/components/ui/sonner.jsx"]})
+Observation: ===FILE: /app/frontend/src/hooks/use-toast.js
+/app/frontend/src/hooks/use-toast.js:
+1|"use client";
+2|// Inspired by react-hot-toast library
+3|import * as React from "react"
+4|
+5|const TOAST_LIMIT = 1
+6|const TOAST_REMOVE_DELAY = 1000000
+7|
+8|const actionTypes = {
+9|  ADD_TOAST: "ADD_TOAST",
+10|  UPDATE_TOAST: "UPDATE_TOAST",
+11|  DISMISS_TOAST: "DISMISS_TOAST",
+12|  REMOVE_TOAST: "REMOVE_TOAST"
+13|}
+14|
+15|let count = 0
+16|
+17|function genId() {
+18|  count = (count + 1) % Number.MAX_SAFE_INTEGER
+19|  return count.toString();
+20|}
+21|
+22|const toastTimeouts = new Map()
+23|
+24|const addToRemoveQueue = (toastId) => {
+25|  if (toastTimeouts.has(toastId)) {
+26|    return
+27|  }
+28|
+29|  const timeout = setTimeout(() => {
+30|    toastTimeouts.delete(toastId)
+31|    dispatch({
+32|      type: "REMOVE_TOAST",
+33|      toastId: toastId,
+34|    })
+35|  }, TOAST_REMOVE_DELAY)
+36|
+37|  toastTimeouts.set(toastId, timeout)
+38|}
+39|
+40|export const reducer = (state, action) => {
+41|  switch (action.type) {
+42|    case "ADD_TOAST":
+43|      return {
+44|        ...state,
+45|        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+46|      };
+47|
+48|    case "UPDATE_TOAST":
+49|      return {
+50|        ...state,
+51|        toasts: state.toasts.map((t) =>
+52|          t.id === action.toast.id ? { ...t, ...action.toast } : t),
+53|      };
+54|
+55|    case "DISMISS_TOAST": {
+56|      const { toastId } = action
+57|
+58|      // ! Side effects ! - This could be extracted into a dismissToast() action,
+59|      // but I'll keep it here for simplicity
+60|      if (toastId) {
+61|        addToRemoveQueue(toastId)
+62|      } else {
+63|        state.toasts.forEach((toast) => {
+64|          addToRemoveQueue(toast.id)
+65|        })
+66|      }
+67|
+68|      return {
+69|        ...state,
+70|        toasts: state.toasts.map((t) =>
+71|          t.id === toastId || toastId === undefined
+72|            ? {
+73|                ...t,
+74|                open: false,
+75|              }
+76|            : t),
+77|      };
+78|    }
+79|    case "REMOVE_TOAST":
+80|      if (action.toastId === undefined) {
+81|        return {
+82|          ...state,
+83|          toasts: [],
+84|        }
+85|      }
+86|      return {
+87|        ...state,
+88|        toasts: state.toasts.filter((t) => t.id !== action.toastId),
+89|      };
+90|  }
+91|}
+92|
+93|const listeners = []
+94|
+95|let memoryState = { toasts: [] }
+96|
+97|function dispatch(action) {
+98|  memoryState = reducer(memoryState, action)
+99|  listeners.forEach((listener) => {
+100|    listener(memoryState)
+101|  })
+102|}
+103|
+104|function toast({
+105|  ...props
+106|}) {
+107|  const id = genId()
+108|
+109|  const update = (props) =>
+110|    dispatch({
+111|      type: "UPDATE_TOAST",
+112|      toast: { ...props, id },
+113|    })
+114|  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
+115|
+116|  dispatch({
+117|    type: "ADD_TOAST",
+118|    toast: {
+119|      ...props,
+120|      id,
+121|      open: true,
+122|      onOpenChange: (open) => {
+123|        if (!open) dismiss()
+124|      },
+125|    },
+126|  })
+127|
+128|  return {
+129|    id: id,
+130|    dismiss,
+131|    update,
+132|  }
+133|}
+134|
+135|function useToast() {
+136|  const [state, setState] = React.useState(memoryState)
+137|
+138|  React.useEffect(() => {
+139|    listeners.push(setState)
+140|    return () => {
+141|      const index = listeners.indexOf(setState)
+142|      if (index > -1) {
+143|        listeners.splice(index, 1)
+144|      }
+145|    };
+146|  }, [state])
+147|
+148|  return {
+149|    ...state,
+150|    toast,
+151|    dismiss: (toastId) => dispatch({ type: "DISMISS_TOAST", toastId }),
+152|  };
+153|}
+154|
+155|export { useToast, toast }
+156|
+
+===END
+
+===FILE: /app/frontend/src/lib/utils.js
+/app/frontend/src/lib/utils.js:
+1|import { clsx } from "clsx";
+2|import { twMerge } from "tailwind-merge"
+3|
+4|export function cn(...inputs) {
+5|  return twMerge(clsx(inputs));
+6|}
+7|
+
+===END
+
+===FILE: /app/frontend/src/components/ui/sonner.jsx
+/app/frontend/src/components/ui/sonner.jsx:
+1|import { useTheme } from "next-themes"
+2|import { Toaster as Sonner, toast } from "sonner"
+3|
+4|const Toaster = ({
+5|  ...props
+6|}) => {
+7|  const { theme = "system" } = useTheme()
+8|
+9|  return (
+10|    <Sonner
+11|      theme={theme}
+12|      className="toaster group"
+13|      toastOptions={{
+14|        classNames: {
+15|          toast:
+16|            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
+17|          description: "group-[.toast]:text-muted-foreground",
+18|          actionButton:
+19|            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
+20|          cancelButton:
+21|            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+22|        },
+23|      }}
+24|      {...props} />
+25|  );
+26|}
+27|
+28|export { Toaster, toast }
+29|
+
+===END
+
+
+Action: execute_bash({"command":"cd /app/backend && pip install httpx==0.27.0 2>&1 | tail -3 && pip freeze | grep -i httpx"})
+Observation: ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+google-genai 2.12.1 requires httpx<1.0.0,>=0.28.1, but you have httpx 0.27.0 which is incompatible.
+Successfully installed httpx-0.27.0
+httpx==0.27.0
+Exit code: 0
+
+
+
+Action: execute_bash({"command":"cd /app/backend && pip freeze > requirements.txt && grep -E \"httpx|motor|fastapi|pymongo\" requirements.txt"})
+Observation: fastapi==0.110.1
+httpx==0.27.0
+motor==3.3.1
+pymongo==4.6.3
+Exit code: 0
+
+
+Action: execute_bash({"command":"cd /app/backend && pip freeze > requirements.txt && grep -E \"httpx|motor|fastapi|pymongo\" requirements.txt"})
+Observation: fastapi==0.110.1
+httpx==0.27.0
+motor==3.3.1
+pymongo==4.6.3
+Exit code: 0
+
+
+
+Action: create_file({"file_text":"// Load Midtrans Snap.js dynamically\nexport function loadMidtransSnap(clientKey, isProduction = false) {\n  return new Promise((resolve, reject) => {\n    if (typeof window === \"undefined\") return reject(new Error(\"No window\"));\n    if (window.snap) return resolve();\n\n    const url = isProduction\n      ? \"https://app.midtrans.com/snap/snap.js\"\n      : \"https://app.sandbox.midtrans.com/snap/snap.js\";\n\n    const existing = document.querySelector(`script[src=\"${url}\"]`);\n    if (existing) {\n      existing.addEventListener(\"load\", () => resolve());\n      existing.addEventListener(\"error\", () => reject(new Error(\"Snap.js failed\")));\n      return;\n    }\n\n    const s = document.createElement(\"script\");\n    s.src = url;\n    s.setAttribute(\"data-client-key\", clientKey);\n    s.async = true;\n    s.onload = () => resolve();\n    s.onerror = () => reject(new Error(\"Failed to load Snap.js\"));\n    document.body.appendChild(s);\n  });\n}\n","path":"/app/frontend/src/lib/midtrans.js"})
+Observation: Create successful: /app/frontend/src/lib/midtrans.js
+
+
+Action: create_file({"file_text":"@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');\n\n@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\nbody {\n    margin: 0;\n    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;\n    -webkit-font-smoothing: antialiased;\n    -moz-osx-font-smoothing: grayscale;\n}\n\n.font-display {\n    font-family: 'Outfit', sans-serif;\n    letter-spacing: -0.02em;\n}\n\n.font-mono {\n    font-family: 'JetBrains Mono', monospace;\n}\n\n@layer base {\n    :root {\n        --background: 0 0% 98%;\n        --foreground: 0 0% 6%;\n        --card: 0 0% 100%;\n        --card-foreground: 0 0% 6%;\n        --popover: 0 0% 100%;\n        --popover-foreground: 0 0% 6%;\n        --primary: 0 100% 50%;\n        --primary-foreground: 0 0% 100%;\n        --secondary: 0 0% 94%;\n        --secondary-foreground: 0 0% 9%;\n        --muted: 0 0% 94%;\n        --muted-foreground: 0 0% 40%;\n        --accent: 0 0% 94%;\n        --accent-foreground: 0 0% 9%;\n        --destructive: 0 84.2% 60.2%;\n        --destructive-foreground: 0 0% 98%;\n        --border: 0 0% 88%;\n        --input: 0 0% 92%;\n        --ring: 0 100% 50%;\n        --radius: 0.75rem;\n    }\n    .dark {\n        --background: 0 0% 4%;\n        --foreground: 0 0% 98%;\n        --card: 0 0% 7%;\n        --card-foreground: 0 0% 98%;\n        --popover: 0 0% 6%;\n        --popover-foreground: 0 0% 98%;\n        --primary: 0 100% 50%;\n        --primary-foreground: 0 0% 100%;\n        --secondary: 0 0% 12%;\n        --secondary-foreground: 0 0% 98%;\n        --muted: 0 0% 12%;\n        --muted-foreground: 0 0% 65%;\n        --accent: 0 0% 14%;\n        --accent-foreground: 0 0% 98%;\n        --destructive: 0 62.8% 45%;\n        --destructive-foreground: 0 0% 98%;\n        --border: 0 0% 15%;\n        --input: 0 0% 12%;\n        --ring: 0 100% 50%;\n    }\n}\n\n@layer base {\n    * {\n        @apply border-border;\n    }\n    body {\n        @apply bg-background text-foreground;\n    }\n    ::selection {\n        background: #FF0000;\n        color: white;\n    }\n}\n\n/* Noise texture overlay */\n.noise-bg {\n    position: relative;\n}\n.noise-bg::before {\n    content: \"\";\n    position: absolute;\n    inset: 0;\n    pointer-events: none;\n    opacity: 0.035;\n    background-image: url(\"data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\");\n    z-index: 0;\n}\n\n/* Grid background */\n.grid-bg {\n    background-image:\n        linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),\n        linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);\n    background-size: 48px 48px;\n}\n.light .grid-bg {\n    background-image:\n        linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),\n        linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px);\n}\n\n/* Red glow */\n.red-glow {\n    box-shadow: 0 0 0 1px rgba(255,0,0,0.4), 0 0 40px 0 rgba(255,0,0,0.25);\n}\n\n.text-red-glow {\n    text-shadow: 0 0 24px rgba(255,0,0,0.5);\n}\n\n/* Scrollbar */\n::-webkit-scrollbar {\n    width: 10px;\n    height: 10px;\n}\n::-webkit-scrollbar-track {\n    background: transparent;\n}\n::-webkit-scrollbar-thumb {\n    background: rgba(255,255,255,0.1);\n    border-radius: 8px;\n}\n::-webkit-scrollbar-thumb:hover {\n    background: rgba(255,0,0,0.5);\n}\n\n@layer base {\n    [data-debug-wrapper=\"true\"] {\n        display: contents !important;\n    }\n}\n","overwrite":true,"path":"/app/frontend/src/index.css"})
+Observation: Overwrite successful: /app/frontend/src/index.css
+
+
+Action: create_file({"file_text":"from fastapi import FastAPI, APIRouter, HTTPException, Request\nfrom dotenv import load_dotenv\nfrom starlette.middleware.cors import CORSMiddleware\nfrom motor.motor_asyncio import AsyncIOMotorClient\nimport os\nimport logging\nimport base64\nimport hashlib\nimport uuid\nfrom pathlib import Path\nfrom pydantic import BaseModel, Field, ConfigDict, EmailStr\nfrom typing import List, Optional\nfrom datetime import datetime, timezone\nimport httpx\n\n\nROOT_DIR = Path(__file__).parent\nload_dotenv(ROOT_DIR / '.env')\n\n# MongoDB connection\nmongo_url = os.environ['MONGO_URL']\nclient = AsyncIOMotorClient(mongo_url)\ndb = client[os.environ['DB_NAME']]\n\n# Midtrans config\nMIDTRANS_SERVER_KEY = os.environ['MIDTRANS_SERVER_KEY']\nMIDTRANS_CLIENT_KEY = os.environ['MIDTRANS_CLIENT_KEY']\nMIDTRANS_IS_PRODUCTION = os.environ.get('MIDTRANS_IS_PRODUCTION', 'false').lower() == 'true'\nMIDTRANS_BASE = \"https://app.midtrans.com\" if MIDTRANS_IS_PRODUCTION else \"https://app.sandbox.midtrans.com\"\nMIDTRANS_SNAP_URL = f\"{MIDTRANS_BASE}/snap/v1/transactions\"\n\napp = FastAPI(title=\"YouTube Growth Hub API\")\napi_router = APIRouter(prefix=\"/api\")\n\n\n# ============ MODELS ============\nclass StatusCheck(BaseModel):\n    model_config = ConfigDict(extra=\"ignore\")\n    id: str = Field(default_factory=lambda: str(uuid.uuid4()))\n    client_name: str\n    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))\n\nclass StatusCheckCreate(BaseModel):\n    client_name: str\n\nclass SeoAuditIn(BaseModel):\n    channel_name: str\n    niche: str\n    video_title: str\n    description: str\n\nclass CtaGenerateIn(BaseModel):\n    category: str  # gaming | tech | vlogging | education | lifestyle | music\n\nclass CreateSnapTokenIn(BaseModel):\n    full_name: str\n    email: EmailStr\n    payment_method: str  # qris | va | ewallet\n    plan: str = \"pro\"\n\nclass PaymentStatusOut(BaseModel):\n    order_id: str\n    status: str\n    email: Optional[str] = None\n\n\n# ============ BASIC ROUTES ============\n@api_router.get(\"/\")\nasync def root():\n    return {\"message\": \"YouTube Growth Hub API is live\"}\n\n@api_router.post(\"/status\", response_model=StatusCheck)\nasync def create_status_check(input: StatusCheckCreate):\n    status_obj = StatusCheck(**input.model_dump())\n    doc = status_obj.model_dump()\n    doc['timestamp'] = doc['timestamp'].isoformat()\n    await db.status_checks.insert_one(doc)\n    return status_obj\n\n@api_router.get(\"/status\", response_model=List[StatusCheck])\nasync def get_status_checks():\n    status_checks = await db.status_checks.find({}, {\"_id\": 0}).to_list(1000)\n    for check in status_checks:\n        if isinstance(check.get('timestamp'), str):\n            check['timestamp'] = datetime.fromisoformat(check['timestamp'])\n    return status_checks\n\n\n# ============ SEO OPTIMIZER ============\n@api_router.post(\"/audit/seo\")\nasync def audit_seo(payload: SeoAuditIn):\n    title = payload.video_title.strip()\n    desc = payload.description.strip()\n    niche = payload.niche.strip().lower()\n\n    tips = []\n    score = 0\n\n    # Title length check\n    tl = len(title)\n    if 40 <= tl <= 70:\n        tips.append({\"ok\": True, \"label\": f\"Title length is optimal ({tl} chars). Great for click-through.\"})\n        score += 20\n    elif tl < 40:\n        tips.append({\"ok\": False, \"label\": f\"Title is too short ({tl} chars). Aim for 40–70 characters.\"})\n    else:\n        tips.append({\"ok\": False, \"label\": f\"Title is too long ({tl} chars). Keep it under 70 to avoid truncation.\"})\n\n    # Keyword in title\n    if niche and niche in title.lower():\n        tips.append({\"ok\": True, \"label\": f\"Primary keyword '{niche}' found in the title.\"})\n        score += 20\n    else:\n        tips.append({\"ok\": False, \"label\": f\"Include your niche keyword ('{payload.niche}') in the title for search visibility.\"})\n\n    # Power words / hooks\n    power_words = [\"how\", \"why\", \"best\", \"top\", \"ultimate\", \"secret\", \"new\", \"review\", \"guide\", \"tutorial\", \"vs\", \"2026\"]\n    if any(pw in title.lower() for pw in power_words):\n        tips.append({\"ok\": True, \"label\": \"Title uses a power/hook word — excellent for CTR.\"})\n        score += 15\n    else:\n        tips.append({\"ok\": False, \"label\": \"Add a hook word (How, Why, Best, Ultimate, Secret, Guide, 2026, etc.).\"})\n\n    # Description length\n    if len(desc) >= 250:\n        tips.append({\"ok\": True, \"label\": f\"Description is detailed ({len(desc)} chars). Great for YouTube search.\"})\n        score += 15\n    else:\n        tips.append({\"ok\": False, \"label\": f\"Description is short ({len(desc)} chars). Aim for 250+ characters with keywords in the first 2 lines.\"})\n\n    # CTA in description\n    cta_terms = [\"subscribe\", \"like\", \"comment\", \"share\", \"notification\", \"bell\"]\n    if any(t in desc.lower() for t in cta_terms):\n        tips.append({\"ok\": True, \"label\": \"Description contains a subscribe/like CTA.\"})\n        score += 15\n    else:\n        tips.append({\"ok\": False, \"label\": \"Add a clear CTA in the description — ask viewers to subscribe & hit the bell.\"})\n\n    # Hashtags / links\n    if \"#\" in desc:\n        tips.append({\"ok\": True, \"label\": \"Hashtags present — helps discoverability.\"})\n        score += 15\n    else:\n        tips.append({\"ok\": False, \"label\": \"Add 3–5 targeted hashtags at the bottom of the description.\"})\n\n    grade = \"A+\" if score >= 90 else \"A\" if score >= 75 else \"B\" if score >= 55 else \"C\" if score >= 35 else \"D\"\n\n    return {\n        \"score\": score,\n        \"grade\": grade,\n        \"tips\": tips,\n        \"channel_name\": payload.channel_name,\n        \"generated_at\": datetime.now(timezone.utc).isoformat(),\n    }\n\n\n# ============ CTA GENERATOR ============\nCTA_LIBRARY = {\n    \"gaming\": {\n        \"verbal\": [\n            \"Yo, if you made it this far and you're not subscribed yet — you're basically part of the squad. Hit that red button so we can level up together.\",\n            \"Quick pause — if this clutch play was insane, smash subscribe. It literally takes one second and it helps me drop more content like this.\",\n            \"Alright chat, if you want more highlights, ranked runs, and tier lists — subscribe now. The algorithm needs to know you rock with me.\",\n        ],\n        \"pinned\": [\n            \"📌 Drop a 'W' if this clip was clean. Sub for daily uploads → new video every Tue/Fri.\",\n            \"📌 What game should I play next? Comment below + hit subscribe so you don't miss the next stream VOD.\",\n        ],\n    },\n    \"tech\": {\n        \"vlogging\": [],\n        \"verbal\": [\n            \"If this saved you time, do me a solid — hit subscribe. I break down one new tool or workflow every week.\",\n            \"Before we wrap: I make honest tech reviews with zero fluff. If that's your vibe, subscribe and hit the bell for the next deep dive.\",\n            \"Subscribing is free, ads are annoying — you know the drill. Let's build the tech-savvy corner of YouTube together.\",\n        ],\n        \"pinned\": [\n            \"📌 Which tool should I test next? Reply with your pick + subscribe so you catch the review.\",\n            \"📌 Full setup + affiliate links in the description. Sub for weekly tech that actually matters.\",\n        ],\n    },\n    \"vlogging\": {\n        \"verbal\": [\n            \"If you like riding along with me on these little adventures, tap subscribe — it means the world to me and it's completely free.\",\n            \"New vlog every Sunday. If you want to hang out again, hit that red button so YouTube shows you the next one.\",\n            \"Real talk — I'm building this community one vlog at a time. Subscribe if you want in.\",\n        ],\n        \"pinned\": [\n            \"📌 Where should I vlog next? Drop your city + subscribe so you're first to see it.\",\n            \"📌 New vlogs every Sunday morning. Grab a coffee ☕ and subscribe.\",\n        ],\n    },\n    \"education\": {\n        \"verbal\": [\n            \"If this concept finally clicked for you, subscribe — I publish a new lesson every week and I promise to keep it clear and jargon-free.\",\n            \"Learning is easier when you don't do it alone. Subscribe and join thousands of others leveling up with me.\",\n            \"One quick favor — if this helped, hit subscribe. It's the single biggest thing you can do to support free educational content.\",\n        ],\n        \"pinned\": [\n            \"📌 Save this video for your next study session. Sub for a new lesson every Monday.\",\n            \"📌 What topic should I cover next? Comment + subscribe to lock it in.\",\n        ],\n    },\n    \"lifestyle\": {\n        \"verbal\": [\n            \"If today's routine gave you ideas, subscribe and stay for the ride — new episodes drop every Wednesday.\",\n            \"Building a slower, more intentional feed — subscribe if that's the kind of energy you want in your recommendations.\",\n        ],\n        \"pinned\": [\n            \"📌 My full morning stack is in the description. Sub for a new routine every Wednesday.\",\n        ],\n    },\n    \"music\": {\n        \"verbal\": [\n            \"If this track hit, subscribe — new original every other Friday. Zero clickbait, just the sound.\",\n            \"Support independent artists — subscribing is free but it means everything.\",\n        ],\n        \"pinned\": [\n            \"📌 Streaming everywhere → link in bio. Sub here for behind-the-scenes + unreleased demos.\",\n        ],\n    },\n}\n\n@api_router.post(\"/cta/generate\")\nasync def generate_cta(payload: CtaGenerateIn):\n    cat = payload.category.lower().strip()\n    library = CTA_LIBRARY.get(cat) or CTA_LIBRARY[\"tech\"]\n    return {\n        \"category\": cat,\n        \"verbal_scripts\": library.get(\"verbal\", []),\n        \"pinned_comments\": library.get(\"pinned\", []),\n    }\n\n\n# ============ MIDTRANS PAYMENT ============\nPLAN_PRICING = {\n    \"pro\": {\"amount\": 75000, \"name\": \"Pro Creator — Monthly\"},\n}\n\n# Map friendly method → Midtrans enabled_payments\nPAYMENT_METHOD_MAP = {\n    \"qris\": [\"other_qris\", \"gopay\"],\n    \"va\": [\"bca_va\", \"bni_va\", \"bri_va\", \"permata_va\", \"cimb_va\", \"other_va\"],\n    \"ewallet\": [\"gopay\", \"shopeepay\", \"other_qris\"],\n}\n\n\n@api_router.post(\"/payments/snap-token\")\nasync def create_snap_token(payload: CreateSnapTokenIn):\n    plan_info = PLAN_PRICING.get(payload.plan)\n    if not plan_info:\n        raise HTTPException(status_code=400, detail=\"Unknown plan\")\n\n    order_id = f\"YTGH-{payload.plan.upper()}-{uuid.uuid4().hex[:10].upper()}\"\n    gross_amount = plan_info[\"amount\"]\n\n    enabled = PAYMENT_METHOD_MAP.get(payload.payment_method, [])\n    name_parts = payload.full_name.strip().split(\" \", 1)\n    first_name = name_parts[0]\n    last_name = name_parts[1] if len(name_parts) > 1 else \"\"\n\n    body = {\n        \"transaction_details\": {\n            \"order_id\": order_id,\n            \"gross_amount\": gross_amount,\n        },\n        \"item_details\": [{\n            \"id\": payload.plan,\n            \"price\": gross_amount,\n            \"quantity\": 1,\n            \"name\": plan_info[\"name\"],\n            \"category\": \"Subscription\",\n        }],\n        \"customer_details\": {\n            \"first_name\": first_name,\n            \"last_name\": last_name,\n            \"email\": payload.email,\n        },\n        \"credit_card\": {\"secure\": True},\n    }\n    if enabled:\n        body[\"enabled_payments\"] = enabled\n\n    auth = base64.b64encode(f\"{MIDTRANS_SERVER_KEY}:\".encode()).decode()\n    headers = {\n        \"Accept\": \"application/json\",\n        \"Content-Type\": \"application/json\",\n        \"Authorization\": f\"Basic {auth}\",\n    }\n\n    async with httpx.AsyncClient(timeout=30) as http_client:\n        r = await http_client.post(MIDTRANS_SNAP_URL, json=body, headers=headers)\n\n    if r.status_code not in (200, 201):\n        logger.error(f\"Midtrans error {r.status_code}: {r.text}\")\n        raise HTTPException(status_code=r.status_code, detail=f\"Midtrans error: {r.text}\")\n\n    data = r.json()\n\n    await db.orders.update_one(\n        {\"order_id\": order_id},\n        {\"$set\": {\n            \"order_id\": order_id,\n            \"plan\": payload.plan,\n            \"gross_amount\": gross_amount,\n            \"full_name\": payload.full_name,\n            \"email\": payload.email,\n            \"payment_method\": payload.payment_method,\n            \"snap_token\": data.get(\"token\"),\n            \"redirect_url\": data.get(\"redirect_url\"),\n            \"status\": \"pending\",\n            \"created_at\": datetime.now(timezone.utc).isoformat(),\n            \"updated_at\": datetime.now(timezone.utc).isoformat(),\n        }},\n        upsert=True,\n    )\n\n    return {\n        \"order_id\": order_id,\n        \"token\": data.get(\"token\"),\n        \"redirect_url\": data.get(\"redirect_url\"),\n        \"gross_amount\": gross_amount,\n        \"client_key\": MIDTRANS_CLIENT_KEY,\n    }\n\n\n@api_router.post(\"/payments/midtrans-webhook\")\nasync def midtrans_webhook(request: Request):\n    notif = await request.json()\n    logger.info(f\"Midtrans webhook received: {notif.get('order_id')} status={notif.get('transaction_status')}\")\n\n    # Verify signature: SHA512(order_id + status_code + gross_amount + ServerKey)\n    raw = f\"{notif.get('order_id','')}{notif.get('status_code','')}{notif.get('gross_amount','')}{MIDTRANS_SERVER_KEY}\"\n    expected = hashlib.sha512(raw.encode()).hexdigest()\n    if notif.get(\"signature_key\") != expected:\n        logger.warning(f\"Invalid signature for order {notif.get('order_id')}\")\n        raise HTTPException(status_code=401, detail=\"Invalid signature\")\n\n    transaction_status = notif.get(\"transaction_status\")\n    fraud_status = notif.get(\"fraud_status\")\n\n    if transaction_status in (\"settlement\",) or (transaction_status == \"capture\" and fraud_status == \"accept\"):\n        status = \"success\"\n    elif transaction_status == \"pending\":\n        status = \"pending\"\n    elif transaction_status in (\"deny\", \"cancel\", \"expire\", \"failure\"):\n        status = \"failed\"\n    else:\n        status = \"unknown\"\n\n    await db.orders.update_one(\n        {\"order_id\": notif.get(\"order_id\")},\n        {\"$set\": {\n            \"status\": status,\n            \"transaction_status\": transaction_status,\n            \"fraud_status\": fraud_status,\n            \"midtrans_payload\": notif,\n            \"updated_at\": datetime.now(timezone.utc).isoformat(),\n        }},\n    )\n\n    # Simulate invoice email on success (log only, no real email service)\n    if status == \"success\":\n        order = await db.orders.find_one({\"order_id\": notif.get(\"order_id\")}, {\"_id\": 0})\n        if order:\n            logger.info(f\"[INVOICE SIMULATION] Sending invoice to {order.get('email')} for order {order.get('order_id')} amount Rp {order.get('gross_amount')}\")\n\n    return {\"message\": \"OK\"}\n\n\n@api_router.get(\"/payments/status/{order_id}\", response_model=PaymentStatusOut)\nasync def payment_status(order_id: str):\n    order = await db.orders.find_one({\"order_id\": order_id}, {\"_id\": 0})\n    if not order:\n        raise HTTPException(status_code=404, detail=\"Order not found\")\n    return PaymentStatusOut(order_id=order_id, status=order.get(\"status\", \"unknown\"), email=order.get(\"email\"))\n\n\n# For local dev/testing: simulate a successful payment (bypasses webhook)\n@api_router.post(\"/payments/simulate-success/{order_id}\")\nasync def simulate_success(order_id: str):\n    order = await db.orders.find_one({\"order_id\": order_id})\n    if not order:\n        raise HTTPException(status_code=404, detail=\"Order not found\")\n    await db.orders.update_one(\n        {\"order_id\": order_id},\n        {\"$set\": {\"status\": \"success\", \"transaction_status\": \"settlement\", \"updated_at\": datetime.now(timezone.utc).isoformat()}},\n    )\n    logger.info(f\"[SIMULATED] Order {order_id} marked as success. Invoice sent to {order.get('email')}\")\n    return {\"order_id\": order_id, \"status\": \"success\"}\n\n\n# Include router & middleware\napp.include_router(api_router)\n\napp.add_middleware(\n    CORSMiddleware,\n    allow_credentials=True,\n    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\n\nlogging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')\nlogger = logging.getLogger(__name__)\n\n@app.on_event(\"shutdown\")\nasync def shutdown_db_client():\n    client.close()\n","overwrite":true,"path":"/app/backend/server.py"})
+Observation: Overwrite successful: /app/backend/server.py
+
+
+
+Action: create_file({"file_text":"import { useEffect } from \"react\";\nimport \"@/App.css\";\nimport { BrowserRouter, Routes, Route } from \"react-router-dom\";\nimport { ThemeProvider } from \"next-themes\";\nimport { Toaster } from \"@/components/ui/sonner\";\nimport YouTubeHub from \"@/pages/YouTubeHub\";\n\nfunction App() {\n  useEffect(() => {\n    // Force dark by default on first paint\n    if (!localStorage.getItem(\"theme\")) {\n      document.documentElement.classList.add(\"dark\");\n    }\n  }, []);\n\n  return (\n    <ThemeProvider attribute=\"class\" defaultTheme=\"dark\" enableSystem={false}>\n      <div className=\"App\" data-testid=\"app-root\">\n        <BrowserRouter>\n          <Routes>\n            <Route path=\"/\" element={<YouTubeHub />} />\n          </Routes>\n        </BrowserRouter>\n        <Toaster position=\"top-right\" richColors />\n      </div>\n    </ThemeProvider>\n  );\n}\n\nexport default App;\n","overwrite":true,"path":"/app/frontend/src/App.js"})
+Observation: Overwrite successful: /app/frontend/src/App.js
+
+
+Action: create_file({"file_text":"REACT_APP_BACKEND_URL=https://youtube-growth-hub-109.preview.emergentagent.com\nWDS_SOCKET_PORT=443\nENABLE_HEALTH_CHECK=false\nREACT_APP_MIDTRANS_CLIENT_KEY=Mid-client-NIf5PyFF26hK_7SJ\nREACT_APP_MIDTRANS_IS_PRODUCTION=false\n","overwrite":true,"path":"/app/frontend/.env"})
+Observation: Overwrite successful: /app/frontend/.env
+
+
+Action: create_file({"file_text":".App {\n    min-height: 100vh;\n}\n","overwrite":true,"path":"/app/frontend/src/App.css"})
+Observation: Overwrite successful: /app/frontend/src/App.css
+
+Now the main pages/components in parallel:
+Action: create_file({"file_text":"import { useTheme } from \"next-themes\";\nimport { Button } from \"@/components/ui/button\";\nimport { Badge } from \"@/components/ui/badge\";\nimport { Youtube, Sun, Moon, Sparkles } from \"lucide-react\";\n\nexport default function Header({ isPro, onUpgrade }) {\n  const { theme, setTheme } = useTheme();\n  const isDark = theme !== \"light\";\n\n  return (\n    <header className=\"sticky top-0 z-40 backdrop-blur-xl bg-background/70 border-b border-white/5\">\n      <div className=\"mx-auto max-w-7xl px-5 sm:px-8 h-16 flex items-center justify-between\">\n        <div className=\"flex items-center gap-3\">\n          <div className=\"relative\">\n            <div className=\"w-10 h-10 rounded-xl bg-[#FF0000] flex items-center justify-center red-glow\">\n              <Youtube className=\"w-5 h-5 text-white\" fill=\"white\" strokeWidth={0} />\n            </div>\n          </div>\n          <div className=\"flex flex-col leading-tight\">\n            <span className=\"font-display font-extrabold text-base tracking-tight\">\n              Growth<span className=\"text-[#FF0000]\">Hub</span>\n            </span>\n            <span className=\"text-[10px] uppercase tracking-[0.2em] text-muted-foreground\">\n              Subscriber Toolkit\n            </span>\n          </div>\n        </div>\n\n        <nav className=\"hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground\">\n          <a href=\"#checklist\" className=\"hover:text-foreground transition-colors\" data-testid=\"nav-checklist\">Checklist</a>\n          <a href=\"#seo\" className=\"hover:text-foreground transition-colors\" data-testid=\"nav-seo\">SEO</a>\n          <a href=\"#cta\" className=\"hover:text-foreground transition-colors\" data-testid=\"nav-cta\">CTA</a>\n          <a href=\"#widget\" className=\"hover:text-foreground transition-colors\" data-testid=\"nav-widget\">Widget</a>\n          <a href=\"#pricing\" className=\"hover:text-foreground transition-colors\" data-testid=\"nav-pricing\">Pricing</a>\n        </nav>\n\n        <div className=\"flex items-center gap-2\">\n          {isPro && (\n            <Badge className=\"hidden sm:flex bg-[#FF0000] hover:bg-[#CC0000] text-white border-0 gap-1\" data-testid=\"pro-badge\">\n              <Sparkles className=\"w-3 h-3\" /> Pro\n            </Badge>\n          )}\n          {!isPro && (\n            <Button\n              onClick={onUpgrade}\n              size=\"sm\"\n              className=\"hidden sm:inline-flex bg-[#FF0000] hover:bg-[#CC0000] text-white rounded-full px-4\"\n              data-testid=\"header-upgrade-btn\"\n            >\n              Upgrade Pro\n            </Button>\n          )}\n          <Button\n            variant=\"ghost\"\n            size=\"icon\"\n            onClick={() => setTheme(isDark ? \"light\" : \"dark\")}\n            className=\"rounded-full\"\n            aria-label=\"Toggle theme\"\n            data-testid=\"theme-toggle-btn\"\n          >\n            {isDark ? <Sun className=\"w-4 h-4\" /> : <Moon className=\"w-4 h-4\" />}\n          </Button>\n        </div>\n      </div>\n    </header>\n  );\n}\n","path":"/app/frontend/src/components/hub/Header.jsx"})
+Observation: Create successful: /app/frontend/src/components/hub/Header.jsx
+
+
+Action: create_file({"file_text":"import { useState } from \"react\";\nimport axios from \"axios\";\nimport { motion } from \"framer-motion\";\nimport { Button } from \"@/components/ui/button\";\nimport { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from \"@/components/ui/select\";\nimport { Label } from \"@/components/ui/label\";\nimport { Copy, Loader2, Mic, MessageSquarePin, Lock } from \"lucide-react\";\nimport { toast } from \"sonner\";\n\nconst API = `${process.env.REACT_APP_BACKEND_URL}/api`;\n\nconst CATEGORIES = [\n  { value: \"gaming\", label: \"Gaming\" },\n  { value: \"tech\", label: \"Tech / Tutorials\" },\n  { value: \"vlogging\", label: \"Vlogging / Lifestyle\" },\n  { value: \"education\", label: \"Education\" },\n  { value: \"lifestyle\", label: \"Lifestyle\" },\n  { value: \"music\", label: \"Music / Creative\" },\n];\n\nexport default function CtaGenerator({ isPro, onUpgrade }) {\n  const [category, setCategory] = useState(\"gaming\");\n  const [loading, setLoading] = useState(false);\n  const [result, setResult] = useState(null);\n\n  const generate = async () => {\n    setLoading(true);\n    try {\n      const { data } = await axios.post(`${API}/cta/generate`, { category });\n      setResult(data);\n    } catch (err) {\n      toast.error(\"Failed to generate CTAs\");\n    } finally {\n      setLoading(false);\n    }\n  };\n\n  const copyText = (text) => {\n    navigator.clipboard.writeText(text);\n    toast.success(\"Copied to clipboard\");\n  };\n\n  return (\n    <section id=\"cta\" className=\"py-12 border-t border-white/5\">\n      <div className=\"flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8\">\n        <div>\n          <div className=\"text-xs uppercase tracking-[0.2em] text-[#FF0000] font-mono mb-2\">03 — Convert</div>\n          <h2 className=\"font-display font-bold text-3xl sm:text-4xl tracking-tight\">CTA & Hook Generator</h2>\n          <p className=\"text-muted-foreground mt-2 max-w-xl\">Battle-tested verbal scripts and pinned comment templates — ready to steal.</p>\n        </div>\n      </div>\n\n      <div className=\"rounded-2xl border border-white/10 bg-card p-6 sm:p-8\">\n        <div className=\"flex flex-col sm:flex-row gap-4 items-end mb-8\">\n          <div className=\"flex-1 w-full\">\n            <Label className=\"text-xs uppercase tracking-[0.15em] text-muted-foreground font-mono mb-2 block\">\n              Channel Category\n            </Label>\n            <Select value={category} onValueChange={setCategory}>\n              <SelectTrigger className=\"bg-background border-white/10 h-11\" data-testid=\"cta-category-select\">\n                <SelectValue />\n              </SelectTrigger>\n              <SelectContent>\n                {CATEGORIES.map((c) => (\n                  <SelectItem key={c.value} value={c.value} data-testid={`cta-category-${c.value}`}>{c.label}</SelectItem>\n                ))}\n              </SelectContent>\n            </Select>\n          </div>\n          {isPro ? (\n            <Button\n              onClick={generate}\n              disabled={loading}\n              className=\"bg-[#FF0000] hover:bg-[#CC0000] text-white rounded-full h-11 px-6 w-full sm:w-auto\"\n              data-testid=\"cta-generate-btn\"\n            >\n              {loading ? <Loader2 className=\"w-4 h-4 mr-2 animate-spin\" /> : null}\n              Generate Scripts\n            </Button>\n          ) : (\n            <Button\n              onClick={onUpgrade}\n              className=\"bg-[#FF0000] hover:bg-[#CC0000] text-white rounded-full h-11 px-6 w-full sm:w-auto\"\n              data-testid=\"cta-upgrade-btn\"\n            >\n              <Lock className=\"w-4 h-4 mr-2\" />\n              Unlock with Pro\n            </Button>\n          )}\n        </div>\n\n        {result && (\n          <div className=\"grid grid-cols-1 md:grid-cols-2 gap-6\">\n            <ResultBlock\n              icon={<Mic className=\"w-4 h-4\" />}\n              title=\"Verbal CTA Scripts\"\n              subtitle=\"Say these on camera\"\n              items={result.verbal_scripts}\n              onCopy={copyText}\n              testPrefix=\"verbal\"\n            />\n            <ResultBlock\n              icon={<MessageSquarePin className=\"w-4 h-4\" />}\n              title=\"Pinned Comment Templates\"\n              subtitle=\"Copy → paste → pin\"\n              items={result.pinned_comments}\n              onCopy={copyText}\n              testPrefix=\"pinned\"\n            />\n          </div>\n        )}\n\n        {!result && (\n          <div className=\"text-center py-8 text-sm text-muted-foreground\">\n            Pick a category and hit generate to see ready-to-use scripts.\n          </div>\n        )}\n      </div>\n    </section>\n  );\n}\n\nfunction ResultBlock({ icon, title, subtitle, items, onCopy, testPrefix }) {\n  return (\n    <div>\n      <div className=\"flex items-center gap-2 mb-4\">\n        <div className=\"w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center text-[#FF0000]\">{icon}</div>\n        <div>\n          <div className=\"font-display font-bold\">{title}</div>\n          <div className=\"text-xs text-muted-foreground\">{subtitle}</div>\n        </div>\n      </div>\n      <div className=\"space-y-3\">\n        {items.map((text, i) => (\n          <motion.div\n            key={i}\n            initial={{ opacity: 0, y: 8 }}\n            animate={{ opacity: 1, y: 0 }}\n            transition={{ delay: i * 0.06 }}\n            className=\"group relative rounded-xl border border-white/10 bg-background p-4 pr-12 text-sm leading-relaxed\"\n          >\n            {text}\n            <button\n              onClick={() => onCopy(text)}\n              className=\"absolute top-3 right-3 w-8 h-8 rounded-lg border border-white/10 flex items-center justify-center hover:bg-[#FF0000] hover:border-[#FF0000] hover:text-white transition-colors\"\n              aria-label=\"Copy\"\n              data-testid={`copy-${testPrefix}-${i}`}\n            >\n              <Copy className=\"w-3.5 h-3.5\" />\n            </button>\n          </motion.div>\n        ))}\n      </div>\n    </div>\n  );\n}\n","path":"/app/frontend/src/components/hub/CtaGenerator.jsx"})
+Observation: Create successful: /app/frontend/src/components/hub/CtaGenerator.jsx
+
+
+
+Action: create_file({"file_text":"import { useState, useMemo } from \"react\";\nimport Header from \"@/components/hub/Header\";\nimport HeroStats from \"@/components/hub/HeroStats\";\nimport GrowthChecklist from \"@/components/hub/GrowthChecklist\";\nimport SeoOptimizer from \"@/components/hub/SeoOptimizer\";\nimport CtaGenerator from \"@/components/hub/CtaGenerator\";\nimport WidgetGenerator from \"@/components/hub/WidgetGenerator\";\nimport Pricing from \"@/components/hub/Pricing\";\nimport CheckoutModal from \"@/components/hub/CheckoutModal\";\nimport SuccessModal from \"@/components/hub/SuccessModal\";\nimport Footer from \"@/components/hub/Footer\";\n\nexport default function YouTubeHub() {\n  const [checkoutOpen, setCheckoutOpen] = useState(false);\n  const [successOpen, setSuccessOpen] = useState(false);\n  const [successPayload, setSuccessPayload] = useState(null);\n  const [isPro, setIsPro] = useState(() => localStorage.getItem(\"ytgh_pro\") === \"true\");\n\n  // Growth stats state — shared with hero + widget\n  const [targetSubs, setTargetSubs] = useState(1000);\n  const [currentSubs, setCurrentSubs] = useState(342);\n  const [dailyRate, setDailyRate] = useState(8);\n\n  const progress = useMemo(() => Math.min(100, Math.round((currentSubs / targetSubs) * 100)), [currentSubs, targetSubs]);\n  const daysToGoal = useMemo(() => {\n    const remaining = Math.max(0, targetSubs - currentSubs);\n    return dailyRate > 0 ? Math.ceil(remaining / dailyRate) : 0;\n  }, [targetSubs, currentSubs, dailyRate]);\n\n  const handleUpgradeClick = () => setCheckoutOpen(true);\n\n  const handlePaymentSuccess = (payload) => {\n    setCheckoutOpen(false);\n    setSuccessPayload(payload);\n    setSuccessOpen(true);\n    setIsPro(true);\n    localStorage.setItem(\"ytgh_pro\", \"true\");\n  };\n\n  return (\n    <div className=\"relative min-h-screen bg-background text-foreground overflow-x-hidden noise-bg\">\n      {/* Ambient red glow */}\n      <div className=\"pointer-events-none fixed top-[-200px] left-[-200px] w-[600px] h-[600px] rounded-full bg-[#FF0000] opacity-[0.08] blur-[120px] z-0\" />\n      <div className=\"pointer-events-none fixed bottom-[-200px] right-[-200px] w-[500px] h-[500px] rounded-full bg-[#FF0000] opacity-[0.06] blur-[100px] z-0\" />\n\n      <div className=\"relative z-10\">\n        <Header isPro={isPro} onUpgrade={handleUpgradeClick} />\n\n        <main className=\"mx-auto max-w-7xl px-5 sm:px-8 pb-24\">\n          <HeroStats\n            targetSubs={targetSubs}\n            currentSubs={currentSubs}\n            dailyRate={dailyRate}\n            progress={progress}\n            daysToGoal={daysToGoal}\n            onChange={{ setTargetSubs, setCurrentSubs, setDailyRate }}\n            onUpgrade={handleUpgradeClick}\n            isPro={isPro}\n          />\n\n          <GrowthChecklist />\n\n          <SeoOptimizer isPro={isPro} onUpgrade={handleUpgradeClick} />\n\n          <CtaGenerator isPro={isPro} onUpgrade={handleUpgradeClick} />\n\n          <WidgetGenerator\n            targetSubs={targetSubs}\n            currentSubs={currentSubs}\n            isPro={isPro}\n            onUpgrade={handleUpgradeClick}\n          />\n\n          <Pricing isPro={isPro} onUpgrade={handleUpgradeClick} />\n        </main>\n\n        <Footer />\n      </div>\n\n      <CheckoutModal\n        open={checkoutOpen}\n        onOpenChange={setCheckoutOpen}\n        onSuccess={handlePaymentSuccess}\n      />\n\n      <SuccessModal\n        open={successOpen}\n        onOpenChange={setSuccessOpen}\n        payload={successPayload}\n      />\n    </div>\n  );\n}\n","path":"/app/frontend/src/pages/YouTubeHub.jsx"})
+Observation: Create successful: /app/frontend/src/pages/YouTubeHub.jsx
+
+
+
+Action: create_file({"file_text":"import { useState, useMemo } from \"react\";\nimport { motion, AnimatePresence } from \"framer-motion\";\nimport { Checkbox } from \"@/components/ui/checkbox\";\nimport { CheckCircle2 } from \"lucide-react\";\n\nconst TASKS = [\n  { id: \"seo\", label: \"Optimize SEO Title & Tags\", detail: \"Keyword-first title, 5–8 relevant tags\" },\n  { id: \"watermark\", label: \"Add Watermark Subscribe Button\", detail: \"YouTube Studio → Customization → Branding\" },\n  { id: \"thumbnail\", label: \"Create Eye-Catching Thumbnail\", detail: \"High contrast, expressive faces, 3-word text max\" },\n  { id: \"shorts\", label: \"Publish Shorts Regularly\", detail: \"3–5 Shorts per week, 30–60s peak retention\" },\n  { id: \"endscreen\", label: \"Add End Screens & Cards\", detail: \"Last 20s: subscribe + next video + playlist\" },\n  { id: \"chapters\", label: \"Add Timestamps / Chapters\", detail: \"Boosts session length & search visibility\" },\n  { id: \"playlist\", label: \"Group Videos into Playlists\", detail: \"Increases watch time per session\" },\n  { id: \"community\", label: \"Post in Community Tab Weekly\", detail: \"Polls + behind-the-scenes = loyal subs\" },\n  { id: \"pinned\", label: \"Pin a Subscribe Comment\", detail: \"First comment converts casual viewers\" },\n  { id: \"collab\", label: \"Collab / Cross-Promote\", detail: \"Guest on similar-size channels monthly\" },\n];\n\nexport default function GrowthChecklist() {\n  const [checked, setChecked] = useState(() => {\n    try { return JSON.parse(localStorage.getItem(\"ytgh_checklist\") || \"{}\"); } catch { return {}; }\n  });\n\n  const toggle = (id) => {\n    const next = { ...checked, [id]: !checked[id] };\n    setChecked(next);\n    localStorage.setItem(\"ytgh_checklist\", JSON.stringify(next));\n  };\n\n  const completedCount = useMemo(() => Object.values(checked).filter(Boolean).length, [checked]);\n  const percent = Math.round((completedCount / TASKS.length) * 100);\n\n  return (\n    <section id=\"checklist\" className=\"py-12 border-t border-white/5 mt-6\">\n      <div className=\"flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8\">\n        <div>\n          <div className=\"text-xs uppercase tracking-[0.2em] text-[#FF0000] font-mono mb-2\">01 — Foundations</div>\n          <h2 className=\"font-display font-bold text-3xl sm:text-4xl tracking-tight\">Organic Growth Checklist</h2>\n          <p className=\"text-muted-foreground mt-2 max-w-xl\">Ten fundamentals every growing channel nails. Check them off as you ship.</p>\n        </div>\n        <div className=\"min-w-[220px]\">\n          <div className=\"flex justify-between text-xs font-mono mb-2\">\n            <span className=\"text-muted-foreground\">Completion</span>\n            <span className=\"text-[#FF0000] font-bold\" data-testid=\"checklist-percent\">{percent}%</span>\n          </div>\n          <div className=\"h-2 rounded-full bg-white/5 overflow-hidden\">\n            <motion.div\n              animate={{ width: `${percent}%` }}\n              transition={{ duration: 0.4 }}\n              className=\"h-full bg-gradient-to-r from-[#FF0000] to-[#FF4444]\"\n            />\n          </div>\n          <div className=\"text-xs text-muted-foreground mt-2 font-mono\">\n            {completedCount} / {TASKS.length} shipped\n          </div>\n        </div>\n      </div>\n\n      <div className=\"grid grid-cols-1 md:grid-cols-2 gap-3\">\n        {TASKS.map((t, i) => {\n          const isChecked = !!checked[t.id];\n          return (\n            <motion.button\n              key={t.id}\n              type=\"button\"\n              onClick={() => toggle(t.id)}\n              initial={{ opacity: 0, y: 8 }}\n              animate={{ opacity: 1, y: 0 }}\n              transition={{ delay: i * 0.03 }}\n              whileHover={{ y: -2 }}\n              className={`text-left group relative rounded-xl border p-5 flex items-start gap-4 transition-colors duration-200 ${\n                isChecked\n                  ? \"border-[#FF0000]/40 bg-[#FF0000]/[0.04]\"\n                  : \"border-white/10 bg-card hover:border-white/20\"\n              }`}\n              data-testid={`checklist-item-${t.id}`}\n            >\n              <div className=\"pt-0.5\">\n                <Checkbox\n                  checked={isChecked}\n                  onCheckedChange={() => toggle(t.id)}\n                  className=\"data-[state=checked]:bg-[#FF0000] data-[state=checked]:border-[#FF0000]\"\n                />\n              </div>\n              <div className=\"flex-1 min-w-0\">\n                <div className={`font-medium transition-all ${isChecked ? \"line-through text-muted-foreground\" : \"text-foreground\"}`}>\n                  {t.label}\n                </div>\n                <div className=\"text-xs text-muted-foreground mt-1\">{t.detail}</div>\n              </div>\n              <AnimatePresence>\n                {isChecked && (\n                  <motion.div\n                    initial={{ scale: 0, rotate: -90 }}\n                    animate={{ scale: 1, rotate: 0 }}\n                    exit={{ scale: 0 }}\n                    className=\"text-[#FF0000]\"\n                  >\n                    <CheckCircle2 className=\"w-5 h-5\" />\n                  </motion.div>\n                )}\n              </AnimatePresence>\n            </motion.button>\n          );\n        })}\n      </div>\n    </section>\n  );\n}\n","path":"/app/frontend/src/components/hub/GrowthChecklist.jsx"})
+Observation: Create successful: /app/frontend/src/components/hub/GrowthChecklist.jsx
+
+
+
+Action: create_file({"file_text":"import { motion } from \"framer-motion\";\nimport { Input } from \"@/components/ui/input\";\nimport { Label } from \"@/components/ui/label\";\nimport { Target, TrendingUp, Calendar, Zap } from \"lucide-react\";\n\nconst fmt = (n) => new Intl.NumberFormat(\"en-US\").format(n);\n\nexport default function HeroStats({ targetSubs, currentSubs, dailyRate, progress, daysToGoal, onChange }) {\n  const remaining = Math.max(0, targetSubs - currentSubs);\n\n  return (\n    <section className=\"pt-12 pb-10\">\n      <motion.div\n        initial={{ opacity: 0, y: 20 }}\n        animate={{ opacity: 1, y: 0 }}\n        transition={{ duration: 0.6 }}\n        className=\"mb-10\"\n      >\n        <div className=\"inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03] mb-6\">\n          <span className=\"w-1.5 h-1.5 rounded-full bg-[#FF0000] animate-pulse\" />\n          <span className=\"text-xs uppercase tracking-[0.2em] text-muted-foreground font-mono\">Organic Growth Engine</span>\n        </div>\n        <h1 className=\"font-display font-black text-4xl sm:text-5xl lg:text-6xl tracking-tight leading-[1.05]\">\n          Build a channel <br/>\n          people <span className=\"text-[#FF0000] text-red-glow\">actually</span> subscribe to.\n        </h1>\n        <p className=\"mt-5 max-w-2xl text-base sm:text-lg text-muted-foreground leading-relaxed\">\n          The all-in-one dashboard for creators — SEO audits, CTA scripts, embeddable sub-goal widgets,\n          and a growth checklist that keeps you moving. No sub-4-sub. Just clean, organic momentum.\n        </p>\n      </motion.div>\n\n      {/* Bento Grid */}\n      <div className=\"grid grid-cols-1 md:grid-cols-6 gap-4\">\n        {/* Big stat card */}\n        <motion.div\n          initial={{ opacity: 0, y: 20 }}\n          animate={{ opacity: 1, y: 0 }}\n          transition={{ delay: 0.1, duration: 0.5 }}\n          className=\"md:col-span-4 relative overflow-hidden rounded-2xl border border-white/10 bg-card p-8 grid-bg\"\n          data-testid=\"hero-progress-card\"\n        >\n          <div className=\"absolute -top-32 -right-32 w-96 h-96 rounded-full bg-[#FF0000] opacity-10 blur-3xl\" />\n          <div className=\"relative\">\n            <div className=\"flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground font-mono mb-4\">\n              <TrendingUp className=\"w-3.5 h-3.5\" /> North Star Metric\n            </div>\n            <div className=\"flex items-end gap-3 flex-wrap\">\n              <div className=\"font-display font-black text-6xl sm:text-7xl tracking-tight leading-none\" data-testid=\"hero-current-subs\">\n                {fmt(currentSubs)}\n              </div>\n              <div className=\"text-lg text-muted-foreground pb-2\">\n                / {fmt(targetSubs)} subs\n              </div>\n            </div>\n            <div className=\"mt-6\">\n              <div className=\"flex justify-between text-xs font-mono mb-2\">\n                <span className=\"text-muted-foreground\">Goal progress</span>\n                <span className=\"text-[#FF0000] font-bold\" data-testid=\"hero-progress-pct\">{progress}%</span>\n              </div>\n              <div className=\"h-2 w-full rounded-full bg-white/5 overflow-hidden\">\n                <motion.div\n                  initial={{ width: 0 }}\n                  animate={{ width: `${progress}%` }}\n                  transition={{ duration: 1.2, ease: \"easeOut\" }}\n                  className=\"h-full bg-gradient-to-r from-[#FF0000] to-[#FF4444]\"\n                />\n              </div>\n            </div>\n\n            <div className=\"mt-8 grid grid-cols-3 gap-4\">\n              <StatEdit icon={<Target className=\"w-3.5 h-3.5\" />} label=\"Target\" value={targetSubs} onChange={onChange.setTargetSubs} testId=\"input-target\" />\n              <StatEdit icon={<Zap className=\"w-3.5 h-3.5\" />} label=\"Current\" value={currentSubs} onChange={onChange.setCurrentSubs} testId=\"input-current\" />\n              <StatEdit icon={<Calendar className=\"w-3.5 h-3.5\" />} label=\"Subs/day\" value={dailyRate} onChange={onChange.setDailyRate} testId=\"input-daily\" />\n            </div>\n          </div>\n        </motion.div>\n\n        {/* Days to goal */}\n        <motion.div\n          initial={{ opacity: 0, y: 20 }}\n          animate={{ opacity: 1, y: 0 }}\n          transition={{ delay: 0.2, duration: 0.5 }}\n          className=\"md:col-span-2 rounded-2xl border border-white/10 bg-card p-8 flex flex-col justify-between\"\n          data-testid=\"hero-days-card\"\n        >\n          <div className=\"flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground font-mono\">\n            <Calendar className=\"w-3.5 h-3.5\" /> Days to Goal\n          </div>\n          <div>\n            <div className=\"font-display font-black text-6xl tracking-tight leading-none\" data-testid=\"hero-days\">\n              {daysToGoal}\n            </div>\n            <div className=\"text-sm text-muted-foreground mt-2\">\n              days at your current pace\n            </div>\n          </div>\n          <div className=\"text-xs text-muted-foreground border-t border-white/5 pt-4\">\n            <span className=\"text-foreground font-bold\">{fmt(remaining)}</span> subscribers to go\n          </div>\n        </motion.div>\n      </div>\n    </section>\n  );\n}\n\nfunction StatEdit({ icon, label, value, onChange, testId }) {\n  return (\n    <div className=\"rounded-xl border border-white/5 bg-white/[0.02] p-3\">\n      <Label className=\"flex items-center gap-1.5 text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono mb-1.5\">\n        {icon} {label}\n      </Label>\n      <Input\n        type=\"number\"\n        min=\"0\"\n        value={value}\n        onChange={(e) => onChange(Math.max(0, parseInt(e.target.value || 0, 10)))}\n        className=\"border-0 bg-transparent p-0 h-auto text-xl font-display font-bold focus-visible:ring-0 focus-visible:ring-offset-0\"\n        data-testid={testId}\n      />\n    </div>\n  );\n}\n","path":"/app/frontend/src/components/hub/HeroStats.jsx"})
+Observation: Create successful: /app/frontend/src/components/hub/HeroStats.jsx
+
+
+
